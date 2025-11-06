@@ -1,4 +1,4 @@
-# WhisperWire (Backend-Only on Vercel)
+# WhisperWire 
 
 A fully open-source, privacy-first backend for E2E secure messaging with optional Gemini-powered AI helpers — deployable entirely on Vercel.
 
