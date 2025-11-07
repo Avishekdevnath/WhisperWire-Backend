@@ -463,11 +463,11 @@ func messageSendHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		ToDeviceID    int64  `json:"to_device_id"`
+		ToDeviceID   int64  `json:"to_device_id"`
 		FromDevicePub string `json:"from_device_pub"`
-		Nonce         string `json:"nonce"`
-		Box           string `json:"box"`
-		HasAttachment bool   `json:"has_attachment"`
+		Nonce        string `json:"nonce"`
+		Box          string `json:"box"`
+		HasAttachment bool  `json:"has_attachment"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		resp.WriteError(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
@@ -606,12 +606,12 @@ func messageInboxHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		messages = append(messages, map[string]any{
-			"id":              id,
+			"id":             id,
 			"from_device_pub": base64.StdEncoding.EncodeToString(fromDevicePub),
-			"nonce":           base64.StdEncoding.EncodeToString(nonce),
-			"box":             base64.StdEncoding.EncodeToString(box),
-			"has_attachment":  hasAttachment,
-			"created_at":      createdAt.Format(time.RFC3339),
+			"nonce":          base64.StdEncoding.EncodeToString(nonce),
+			"box":            base64.StdEncoding.EncodeToString(box),
+			"has_attachment": hasAttachment,
+			"created_at":     createdAt.Format(time.RFC3339),
 		})
 	}
 
@@ -1093,3 +1093,4 @@ func swaggerUIHandler(w http.ResponseWriter, r *http.Request) {
 func openapiHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "openapi/openapi.yaml")
 }
+
