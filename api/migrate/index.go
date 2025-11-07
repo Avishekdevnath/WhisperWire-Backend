@@ -12,6 +12,7 @@ import (
 	"whisperwire/pkg/resp"
 )
 
+// Handler for database migration
 func Handler(w http.ResponseWriter, r *http.Request) {
 	config.Init()
 	if r.Method != http.MethodPost {
