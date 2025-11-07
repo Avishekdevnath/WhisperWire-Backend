@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"os"
 
-	"whisperwire/internal/config"
-	"whisperwire/internal/resp"
+	"whisperwire/pkg/config"
+	"whisperwire/pkg/resp"
 )
 
 type summarizeRequest struct {

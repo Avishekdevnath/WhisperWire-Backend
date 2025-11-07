@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"whisperwire/internal/config"
-	"whisperwire/internal/resp"
+	"whisperwire/pkg/config"
+	"whisperwire/pkg/resp"
 )
 
 type suggestRequest struct {

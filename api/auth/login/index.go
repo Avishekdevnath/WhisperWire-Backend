@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"whisperwire/internal/auth"
-	"whisperwire/internal/config"
-	"whisperwire/internal/db"
-	"whisperwire/internal/resp"
+	"whisperwire/pkg/auth"
+	"whisperwire/pkg/config"
+	"whisperwire/pkg/db"
+	"whisperwire/pkg/resp"
 )
 
 type loginRequest struct {

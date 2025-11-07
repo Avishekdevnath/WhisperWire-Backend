@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"time"
 
-	"whisperwire/internal/auth"
-	"whisperwire/internal/config"
-	"whisperwire/internal/db"
-	"whisperwire/internal/middleware"
-	"whisperwire/internal/resp"
+	"whisperwire/pkg/auth"
+	"whisperwire/pkg/config"
+	"whisperwire/pkg/db"
+	"whisperwire/pkg/middleware"
+	"whisperwire/pkg/resp"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {

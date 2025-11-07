@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"whisperwire/internal/auth"
-	"whisperwire/internal/resp"
+	"whisperwire/pkg/auth"
+	"whisperwire/pkg/resp"
 )
 
 func RequireAuth(next http.HandlerFunc) http.HandlerFunc {

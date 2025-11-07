@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"whisperwire/internal/auth"
-	"whisperwire/internal/crypto"
-	"whisperwire/internal/db"
-	"whisperwire/internal/resp"
+	"whisperwire/pkg/auth"
+	"whisperwire/pkg/crypto"
+	"whisperwire/pkg/db"
+	"whisperwire/pkg/resp"
 )
 
 // Device handlers
