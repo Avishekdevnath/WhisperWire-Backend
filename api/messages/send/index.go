@@ -2,14 +2,12 @@ package handler
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
-	"whisperwire/pkg/auth"
 	"whisperwire/pkg/config"
 	"whisperwire/pkg/crypto"
 	"whisperwire/pkg/db"
@@ -20,9 +18,9 @@ import (
 type sendRequest struct {
 	ToDeviceID    int64  `json:"to_device_id"`
 	FromDevicePub string `json:"from_device_pub"` // base64 Ed25519 public key
-	Nonce          string `json:"nonce"`          // base64 nonce
-	Box            string `json:"box"`             // base64 encrypted message
-	HasAttachment  bool   `json:"has_attachment"`
+	Nonce         string `json:"nonce"`           // base64 nonce
+	Box           string `json:"box"`             // base64 encrypted message
+	HasAttachment bool   `json:"has_attachment"`
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -106,4 +104,3 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		})
 	})(w, r)
 }
-
