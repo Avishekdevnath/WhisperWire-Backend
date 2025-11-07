@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"context"
@@ -70,5 +70,3 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
-
-

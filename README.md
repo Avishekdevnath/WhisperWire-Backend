@@ -92,13 +92,40 @@ See `openapi/openapi.yaml` for detailed API documentation.
 
 ## Deployment
 
-### Vercel
+### Option 1: Deploy from Terminal (Recommended)
+
+```bash
+# Install Vercel CLI
+npm install -g vercel
+
+# Login
+vercel login
+
+# Link project (first time)
+vercel link
+
+# Add environment variables
+vercel env add POSTGRES_URL
+vercel env add JWT_SECRET
+vercel env add MIGRATE_TOKEN
+
+# Deploy to production
+vercel --prod
+
+# Or use the deploy script
+bash scripts/deploy.sh  # macOS/Linux
+pwsh scripts/deploy.ps1 # Windows
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
+
+### Option 2: Deploy via GitHub
 
 1. **Push to GitHub**
 2. **Import to Vercel** → select Go runtime
 3. **Add Postgres** → Vercel Postgres integration
 4. **Set environment variables** (see `env.example`)
-5. **Deploy** → Vercel builds `api/*.go` as serverless functions
+5. **Deploy** → Vercel auto-deploys on push to main
 6. **Run migration** using the `/api/_admin/migrate` endpoint
 
 ### Environment Variables

@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"context"
@@ -74,4 +74,3 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		resp.WriteJSON(w, http.StatusOK, map[string]any{"devices": devices})
 	})(w, r)
 }
-

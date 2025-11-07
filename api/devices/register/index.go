@@ -1,8 +1,7 @@
-package main
+package handler
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -16,9 +15,9 @@ import (
 )
 
 type registerRequest struct {
-	Name        string `json:"name"`
-	Ed25519Pub  string `json:"ed25519_pub"`  // base64 encoded
-	X25519Pub   string `json:"x25519_pub"`   // base64 encoded
+	Name       string `json:"name"`
+	Ed25519Pub string `json:"ed25519_pub"` // base64 encoded
+	X25519Pub  string `json:"x25519_pub"`  // base64 encoded
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -90,4 +89,3 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		})
 	})(w, r)
 }
-
