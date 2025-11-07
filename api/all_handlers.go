@@ -13,10 +13,222 @@ import (
 	"time"
 
 	"whisperwire/pkg/auth"
+	"whisperwire/pkg/config"
 	"whisperwire/pkg/crypto"
 	"whisperwire/pkg/db"
 	"whisperwire/pkg/resp"
 )
+
+// Health handler
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	config.Init()
+	status := map[string]any{"status": "ok"}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	if pool, err := db.Get(ctx); err == nil {
+		if err := pool.Ping(ctx); err == nil {
+			status["db"] = "up"
+		} else {
+			status["db"] = "down"
+			status["db_error"] = err.Error()
+		}
+	} else {
+		status["db"] = "down"
+		status["db_error"] = err.Error()
+	}
+	resp.WriteJSON(w, http.StatusOK, status)
+}
+
+// Migrate handler
+func migrateHandler(w http.ResponseWriter, r *http.Request) {
+	config.Init()
+	if r.Method != http.MethodPost {
+		resp.WriteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "use POST")
+		return
+	}
+	migrateToken := os.Getenv("MIGRATE_TOKEN")
+	if migrateToken == "" || r.Header.Get("X-Migrate-Token") != migrateToken {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	pool, err := db.Get(ctx)
+	if err != nil {
+		resp.WriteError(w, http.StatusInternalServerError, "db_connect_error", err.Error())
+		return
+	}
+
+	stmts := []string{
+		`CREATE TABLE IF NOT EXISTS users (
+			id SERIAL PRIMARY KEY,
+			email TEXT UNIQUE NOT NULL,
+			password_hash TEXT NOT NULL,
+			created_at TIMESTAMPTZ DEFAULT now()
+		)`,
+		`CREATE TABLE IF NOT EXISTS devices (
+			id SERIAL PRIMARY KEY,
+			user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			ed25519_pub BYTEA NOT NULL,
+			x25519_pub BYTEA NOT NULL,
+			created_at TIMESTAMPTZ DEFAULT now()
+		)`,
+		`CREATE TABLE IF NOT EXISTS prekeys (
+			id SERIAL PRIMARY KEY,
+			device_id INT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+			x25519_pub BYTEA NOT NULL,
+			is_used BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at TIMESTAMPTZ DEFAULT now()
+		)`,
+		`CREATE TABLE IF NOT EXISTS messages (
+			id BIGSERIAL PRIMARY KEY,
+			to_device_id INT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+			from_device_pub BYTEA NOT NULL,
+			nonce BYTEA NOT NULL,
+			box BYTEA NOT NULL,
+			has_attachment BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at TIMESTAMPTZ DEFAULT now(),
+			delivered_at TIMESTAMPTZ,
+			read_at TIMESTAMPTZ
+		)`,
+		`CREATE TABLE IF NOT EXISTS attachments (
+			id BIGSERIAL PRIMARY KEY,
+			message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+			bytes BYTEA NOT NULL,
+			size_bytes INT NOT NULL,
+			created_at TIMESTAMPTZ DEFAULT now()
+		)`,
+	}
+
+	for _, stmt := range stmts {
+		if _, err := pool.Exec(ctx, strings.TrimSpace(stmt)); err != nil {
+			resp.WriteError(w, http.StatusInternalServerError, "migration_failed", err.Error())
+			return
+		}
+	}
+
+	resp.WriteJSON(w, http.StatusOK, map[string]string{"status": "migrated"})
+}
+
+// Auth handlers
+func signupHandler(w http.ResponseWriter, r *http.Request) {
+	config.Init()
+	if r.Method != http.MethodPost {
+		resp.WriteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "use POST")
+		return
+	}
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		resp.WriteError(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	if req.Email == "" || req.Password == "" {
+		resp.WriteError(w, http.StatusBadRequest, "bad_request", "email and password are required")
+		return
+	}
+	if len(req.Password) < 8 {
+		resp.WriteError(w, http.StatusBadRequest, "weak_password", "password must be at least 8 characters")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	pool, err := db.Get(ctx)
+	if err != nil {
+		resp.WriteError(w, http.StatusInternalServerError, "db_connect_error", err.Error())
+		return
+	}
+
+	passwordHash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		resp.WriteError(w, http.StatusInternalServerError, "hash_error", err.Error())
+		return
+	}
+
+	var userID int64
+	row := pool.QueryRow(ctx, `INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id`, req.Email, passwordHash)
+	if err := row.Scan(&userID); err != nil {
+		resp.WriteError(w, http.StatusConflict, "email_exists", "email already registered")
+		return
+	}
+
+	access, refresh, err := auth.GenerateTokens(userID)
+	if err != nil {
+		resp.WriteError(w, http.StatusInternalServerError, "token_error", err.Error())
+		return
+	}
+
+	resp.WriteJSON(w, http.StatusOK, map[string]any{
+		"access_token":  access,
+		"refresh_token": refresh,
+		"user": map[string]any{
+			"id":    userID,
+			"email": req.Email,
+		},
+	})
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	config.Init()
+	if r.Method != http.MethodPost {
+		resp.WriteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "use POST")
+		return
+	}
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		resp.WriteError(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	if req.Email == "" || req.Password == "" {
+		resp.WriteError(w, http.StatusBadRequest, "bad_request", "email and password are required")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	pool, err := db.Get(ctx)
+	if err != nil {
+		resp.WriteError(w, http.StatusInternalServerError, "db_connect_error", err.Error())
+		return
+	}
+
+	var userID int64
+	var passwordHash string
+	row := pool.QueryRow(ctx, `SELECT id, password_hash FROM users WHERE email = $1`, req.Email)
+	if err := row.Scan(&userID, &passwordHash); err != nil {
+		resp.WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+		return
+	}
+	if err := auth.CheckPassword(req.Password, passwordHash); err != nil {
+		resp.WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+		return
+	}
+
+	access, refresh, err := auth.GenerateTokens(userID)
+	if err != nil {
+		resp.WriteError(w, http.StatusInternalServerError, "token_error", err.Error())
+		return
+	}
+
+	resp.WriteJSON(w, http.StatusOK, map[string]any{
+		"access_token":  access,
+		"refresh_token": refresh,
+		"user": map[string]any{
+			"id":    userID,
+			"email": req.Email,
+		},
+	})
+}
 
 // Device handlers
 func deviceRegisterHandler(w http.ResponseWriter, r *http.Request) {
