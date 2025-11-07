@@ -1,9 +1,13 @@
 package handler
 
 import (
+	_ "embed"
 	"net/http"
 	"strings"
 )
+
+//go:embed openapi.yaml
+var openapiSpec string
 
 // Handler serves Swagger UI and OpenAPI spec
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -55,6 +59,7 @@ func swaggerUIHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func openapiHandler(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "openapi/openapi.yaml")
+	w.Header().Set("Content-Type", "text/yaml")
+	w.Write([]byte(openapiSpec))
 }
 
