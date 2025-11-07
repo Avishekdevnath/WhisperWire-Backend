@@ -43,10 +43,9 @@ func GenerateX25519KeyPair() (publicKey, privateKey []byte, err error) {
 	}
 	var privateKeyArr [32]byte
 	copy(privateKeyArr[:], privateKeyBytes)
-	
+
 	var publicKeyArr [32]byte
 	curve25519.ScalarBaseMult(&publicKeyArr, &privateKeyArr)
-	
+
 	return publicKeyArr[:], privateKeyArr[:], nil
 }
-

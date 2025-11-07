@@ -20,5 +20,3 @@ func UserIDFromContext(ctx context.Context) (int64, bool) {
 	}
 	return 0, false
 }
-
-

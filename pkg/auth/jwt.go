@@ -98,5 +98,3 @@ func ParseToken(tokenString string) (*Claims, int64, error) {
 	}
 	return nil, 0, errors.New("invalid token claims")
 }
-
-
