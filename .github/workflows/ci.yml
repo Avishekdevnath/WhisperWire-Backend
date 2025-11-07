@@ -27,8 +27,8 @@ jobs:
     - name: Verify dependencies
       run: go mod verify
 
-    - name: Build internal packages
-      run: go build ./internal/...
+    - name: Build library packages
+      run: go build ./pkg/...
 
     - name: Build local server
       run: go build ./cmd/server
