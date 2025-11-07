@@ -38,7 +38,7 @@ func swaggerUIHandler(w http.ResponseWriter, r *http.Request) {
   <script>
     window.onload = function() {
       window.ui = SwaggerUIBundle({
-        url: "/api/docs/openapi.yaml",
+        url: "/api/openapi",
         dom_id: '#swagger-ui',
         deepLinking: true,
         presets: [
