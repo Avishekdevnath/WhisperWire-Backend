@@ -60,7 +60,12 @@ func main() {
 	mux.HandleFunc("/api/assistant/moderate", assistantModerateHandler)
 	mux.HandleFunc("/api/assistant/summarize", assistantSummarizeHandler)
 
+	// Swagger UI and OpenAPI spec
+	mux.HandleFunc("/", swaggerUIHandler)
+	mux.HandleFunc("/openapi.yaml", openapiHandler)
+
 	fmt.Printf("🚀 WhisperWire server running on http://localhost:%s\n", port)
+	fmt.Printf("📚 Swagger UI available at http://localhost:%s/\n", port)
 	fmt.Println("📋 Available endpoints:")
 	fmt.Println("  GET  /api/health")
 	fmt.Println("  POST /api/_admin/migrate")
@@ -232,6 +237,51 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func swaggerUIHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	html := `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WhisperWire API Documentation</title>
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body { margin: 0; padding: 0; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = function() {
+      window.ui = SwaggerUIBundle({
+        url: "/openapi.yaml",
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout"
+      });
+    };
+  </script>
+</body>
+</html>`
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(html))
+}
+
+func openapiHandler(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "openapi/openapi.yaml")
+}
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		resp.WriteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "use POST")
@@ -286,4 +336,3 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
-

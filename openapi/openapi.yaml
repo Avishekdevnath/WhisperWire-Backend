@@ -1,20 +1,161 @@
 openapi: 3.0.3
 info:
   title: WhisperWire API
-  version: 0.1.0
-  description: Backend-only API for E2E secure messaging on Vercel
+  version: 1.0.0
+  description: |
+    Backend-only API for E2E secure messaging with optional AI features.
+    
+    ## Authentication
+    Most endpoints require JWT authentication via Bearer token in the Authorization header:
+    ```
+    Authorization: Bearer <your-access-token>
+    ```
+  contact:
+    name: WhisperWire
+    url: https://github.com/Avishekdevnath/WhisperWire-Backend
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
 servers:
   - url: https://your-app.vercel.app
+    description: Production
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Auth
+    description: Authentication endpoints
+  - name: Devices
+    description: Device management
+  - name: Prekeys
+    description: Prekey exchange for E2E encryption
+  - name: Messages
+    description: Encrypted message operations
+  - name: Attachments
+    description: File attachment operations
+  - name: Assistant
+    description: AI-powered features (Gemini)
+  - name: Admin
+    description: Administrative endpoints
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+    
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+    
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+    
+    Device:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        ed25519_pub:
+          type: string
+          description: Base64-encoded Ed25519 public key
+        x25519_pub:
+          type: string
+          description: Base64-encoded X25519 public key
+        created_at:
+          type: string
+          format: date-time
+    
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        from_device_pub:
+          type: string
+          description: Base64-encoded sender's public key
+        nonce:
+          type: string
+          description: Base64-encoded nonce
+        box:
+          type: string
+          description: Base64-encoded encrypted message
+        has_attachment:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
 paths:
   /api/health:
     get:
+      tags: [Health]
       summary: Health check
+      description: Returns server status and database connectivity
       responses:
         '200':
-          description: OK
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  db:
+                    type: string
+                    example: up
+  
+  /api/_admin/migrate:
+    post:
+      tags: [Admin]
+      summary: Run database migrations
+      description: Initialize database schema (run once after deployment)
+      security:
+        - MigrateToken: []
+      parameters:
+        - in: header
+          name: X-Migrate-Token
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Migration successful
+        '403':
+          description: Invalid or missing migrate token
+  
   /api/auth/signup:
     post:
-      summary: Sign up a new user
+      tags: [Auth]
+      summary: Register a new user
       requestBody:
         required: true
         content:
@@ -24,15 +165,27 @@ paths:
               properties:
                 email:
                   type: string
+                  format: email
                 password:
                   type: string
+                  minLength: 8
               required: [email, password]
       responses:
         '200':
-          description: Created
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid request
+        '409':
+          description: Email already exists
+  
   /api/auth/login:
     post:
-      summary: Log in an existing user
+      tags: [Auth]
+      summary: Login an existing user
       requestBody:
         required: true
         content:
@@ -42,11 +195,364 @@ paths:
               properties:
                 email:
                   type: string
+                  format: email
                 password:
                   type: string
               required: [email, password]
       responses:
         '200':
-          description: OK
-
-
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+  
+  /api/devices/register:
+    post:
+      tags: [Devices]
+      summary: Register a new device
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "iPhone 15"
+                ed25519_pub:
+                  type: string
+                  description: Base64-encoded Ed25519 public key
+                x25519_pub:
+                  type: string
+                  description: Base64-encoded X25519 public key
+              required: [name, ed25519_pub, x25519_pub]
+      responses:
+        '200':
+          description: Device registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device_id:
+                    type: integer
+                  name:
+                    type: string
+        '401':
+          description: Unauthorized
+  
+  /api/devices/list:
+    get:
+      tags: [Devices]
+      summary: List user's devices
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of devices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Device'
+  
+  /api/devices/prekeys:
+    post:
+      tags: [Prekeys]
+      summary: Upload prekeys for a device
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device_id:
+                  type: integer
+                prekeys:
+                  type: array
+                  items:
+                    type: string
+                    description: Base64-encoded X25519 public keys
+              required: [device_id, prekeys]
+      responses:
+        '200':
+          description: Prekeys stored
+        '403':
+          description: Device doesn't belong to user
+  
+  /api/devices/prekeys/{deviceID}:
+    get:
+      tags: [Prekeys]
+      summary: Consume a prekey for key exchange
+      parameters:
+        - in: path
+          name: deviceID
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Prekey returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prekey_id:
+                    type: integer
+                  x25519_pub:
+                    type: string
+        '404':
+          description: No available prekeys
+  
+  /api/messages/send:
+    post:
+      tags: [Messages]
+      summary: Send an encrypted message
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                to_device_id:
+                  type: integer
+                from_device_pub:
+                  type: string
+                  description: Base64-encoded sender's Ed25519 public key
+                nonce:
+                  type: string
+                  description: Base64-encoded nonce
+                box:
+                  type: string
+                  description: Base64-encoded encrypted message
+                has_attachment:
+                  type: boolean
+              required: [to_device_id, from_device_pub, nonce, box]
+      responses:
+        '200':
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message_id:
+                    type: integer
+                  status:
+                    type: string
+        '404':
+          description: Target device not found
+  
+  /api/messages/inbox:
+    get:
+      tags: [Messages]
+      summary: Get undelivered messages
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: device_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+  
+  /api/messages/{id}/{status}:
+    post:
+      tags: [Messages]
+      summary: Update message status
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: status
+          required: true
+          schema:
+            type: string
+            enum: [delivered, read]
+      responses:
+        '200':
+          description: Status updated
+        '404':
+          description: Message not found
+  
+  /api/attachments:
+    post:
+      tags: [Attachments]
+      summary: Upload an attachment
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message_id:
+                  type: integer
+                bytes:
+                  type: string
+                  description: Base64-encoded attachment data
+              required: [message_id, bytes]
+      responses:
+        '200':
+          description: Attachment uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  attachment_id:
+                    type: integer
+                  size_bytes:
+                    type: integer
+        '413':
+          description: Attachment too large
+  
+  /api/attachments/{id}:
+    get:
+      tags: [Attachments]
+      summary: Download an attachment
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Attachment data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  attachment_id:
+                    type: integer
+                  bytes:
+                    type: string
+                  size_bytes:
+                    type: integer
+        '404':
+          description: Attachment not found
+  
+  /api/assistant/suggest:
+    post:
+      tags: [Assistant]
+      summary: Get AI-powered reply suggestions
+      description: Uses Gemini to generate 3 friendly reply suggestions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  description: The message to generate replies for
+              required: [text]
+      responses:
+        '200':
+          description: Suggestions generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: string
+        '503':
+          description: AI service unavailable
+  
+  /api/assistant/moderate:
+    post:
+      tags: [Assistant]
+      summary: Moderate content for harmful material
+      description: Uses Gemini to analyze content for hate speech, harassment, etc.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+              required: [text]
+      responses:
+        '200':
+          description: Moderation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  safe:
+                    type: boolean
+                  reason:
+                    type: string
+  
+  /api/assistant/summarize:
+    post:
+      tags: [Assistant]
+      summary: Summarize text
+      description: Uses Gemini to create a 1-2 sentence summary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+              required: [text]
+      responses:
+        '200':
+          description: Summary generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: string
